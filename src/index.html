@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>🐍 Snake Game · Heron Wang</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--cyan:#00f5d4;--blue:#00bbf9;--purple:#9b5de5;--pink:#f15bb5;--bg1:#0f0f23;--bg2:#1a1a3e;--bg3:#2d1b4e;--text:#e0e0e0;--muted:#888}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,var(--bg1) 0%,var(--bg2) 50%,var(--bg3) 100%);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.5rem;-webkit-user-select:none;user-select:none}
+
+h1{font-size:clamp(1.4rem,4vw,2.2rem);margin-bottom:0.3rem;background:linear-gradient(90deg,var(--cyan),var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{color:var(--muted);margin-bottom:0.6rem;font-size:0.85rem}
+.badge{display:inline-block;padding:0.15rem 0.6rem;background:rgba(0,245,212,0.1);border:1px solid rgba(0,245,212,0.3);border-radius:20px;color:var(--cyan);font-size:0.72rem;margin-bottom:0.5rem}
+
+.game-info{display:flex;gap:1.5rem;margin:0.5rem 0;font-size:1rem}
+.score{color:var(--cyan);font-family:monospace}
+.high-score{color:var(--pink);font-family:monospace}
+
+#gameContainer{position:relative;touch-action:none;-webkit-touch-callout:none}
+canvas{border:2px solid rgba(0,245,212,0.3);border-radius:12px;background:#0a0a1a;box-shadow:0 0 30px rgba(0,245,212,0.15);display:block;touch-action:none}
+
+/* 虚拟方向键 */
+.dpad{display:none;position:relative;width:160px;height:160px;margin:1rem auto 0}
+.dpad-btn{position:absolute;width:50px;height:50px;border-radius:12px;background:rgba(0,245,212,0.1);border:1px solid rgba(0,245,212,0.3);color:var(--cyan);font-size:1.4rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .1s;touch-action:manipulation;-webkit-touch-callout:none}
+.dpad-btn:active{background:rgba(0,245,212,0.3);transform:scale(0.9)}
+.dpad-up{top:0;left:55px}
+.dpad-down{bottom:0;left:55px}
+.dpad-left{top:55px;left:0}
+.dpad-right{top:55px;right:0}
+
+.controls{margin-top:0.6rem;color:var(--muted);font-size:0.75rem;text-align:center}
+.back-link{color:var(--cyan);font-size:0.8rem;margin-top:0.3rem}
+.back-link a{color:var(--blue);text-decoration:none}
+.footer{margin-top:0.5rem;color:#444;font-size:0.72rem}
+
+/* overlay */
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.overlay-content{background:rgba(30,30,60,0.95);border:1px solid rgba(0,245,212,0.3);border-radius:16px;padding:1.5rem 2rem;text-align:center;max-width:90vw}
+.overlay-content h2{font-size:1.5rem;margin-bottom:0.8rem;color:var(--cyan)}
+.overlay-content p{color:#a0a0c0;margin-bottom:1.2rem;font-size:0.9rem;line-height:1.5}
+.btn{padding:0.6rem 1.8rem;font-size:0.95rem;cursor:pointer;background:linear-gradient(90deg,var(--cyan),var(--blue));color:var(--bg1);border:none;border-radius:8px;font-weight:bold;transition:transform .15s;-webkit-touch-callout:none;touch-action:manipulation}
+.btn:active{transform:scale(0.95)}
+
+/* 移动端显示方向键 */
+@media(max-width:768px) and (pointer:coarse){
+  .dpad{display:block}
+  .controls{display:none}
+}
+@media(max-height:700px) and (pointer:coarse){
+  h1{font-size:1.1rem}
+  .subtitle,.badge{display:none}
+  .dpad{width:140px;height:140px;margin-top:0.5rem}
+  .dpad-btn{width:44px;height:44px;font-size:1.2rem}
+  .dpad-up,.dpad-down{left:48px}
+  .dpad-left,.dpad-right{top:48px}
+}
+</style>
+</head>
+<body>
+<div class="badge">Snake Game</div>
+<h1>🐍 Snake Game</h1>
+<p class="subtitle">Heron Wang · snake.heronwang.cn</p>
+<div class="game-info">
+<span>Score: <span class="score" id="score">0</span></span>
+<span>Best: <span class="high-score" id="highScore">0</span></span>
+</div>
+
+<div id="gameContainer">
+<canvas id="game" width="400" height="400"></canvas>
+</div>
+
+<div class="dpad" id="dpad">
+<div class="dpad-btn dpad-up" data-dir="up">▲</div>
+<div class="dpad-btn dpad-down" data-dir="down">▼</div>
+<div class="dpad-btn dpad-left" data-dir="left">◀</div>
+<div class="dpad-btn dpad-right" data-dir="right">▶</div>
+</div>
+
+<div class="controls">Arrow Keys / WASD · Space to pause · Mobile: swipe or D-pad</div>
+<div class="back-link"><a href="https://heronwang.cn">← 返回主页</a></div>
+<p class="footer">Powered by Rust · Cloudflare Tunnel</p>
+
+<div class="overlay" id="startOverlay">
+<div class="overlay-content">
+<h2>🐍 Snake Game</h2>
+<p>Use arrow keys, WASD, swipe, or D-pad to control the snake.<br>Eat the food, grow longer, don't hit the wall!</p>
+<button class="btn" id="startBtn">Start Game</button>
+</div>
+</div>
+
+<div class="overlay" id="gameOverOverlay" style="display:none;">
+<div class="overlay-content">
+<h2 id="gameOverTitle">Game Over!</h2>
+<p id="gameOverMsg">Score: 0</p>
+<button class="btn" id="restartBtn">Play Again</button>
+</div>
+</div>
+
+<script>
+(function(){
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const container=document.getElementById('gameContainer');
+const GRID=20;
+let COLS,ROWS,cellSize;
+let snake,food,dx,dy,score,running,paused,loop;
+let highScore=parseInt(localStorage.getItem('snakeHighScore')||'0');
+document.getElementById('highScore').textContent=highScore;
+
+// ── 响应式画布 ─────────────────────────────
+function resizeCanvas(){
+  const isMobile=window.matchMedia('(max-width:768px)').matches;
+  const availW=Math.min(window.innerWidth-20,500);
+  const availH=window.innerHeight;
+  // 移动端：考虑 D-pad 和其他元素高度
+  const reservedH=isMobile?280:200;
+  let size=Math.min(availW,availH-reservedH);
+  size=Math.max(size,200); // 最小 200px
+  // 对齐到 GRID 的整数倍
+  size=Math.floor(size/GRID)*GRID;
+  canvas.width=size;
+  canvas.height=size;
+  cellSize=size/GRID;
+  COLS=GRID;
+  ROWS=GRID;
+  if(running)draw();
+}
+resizeCanvas();
+window.addEventListener('resize',resizeCanvas);
+window.addEventListener('orientationchange',()=>setTimeout(resizeCanvas,100));
+
+// ── 游戏逻辑 ───────────────────────────────
+function init(){
+  const cx=Math.floor(COLS/2),cy=Math.floor(ROWS/2);
+  snake=[{x:cx,y:cy},{x:cx-1,y:cy},{x:cx-2,y:cy}];
+  dx=1;dy=0;score=0;paused=false;
+  document.getElementById('score').textContent='0';
+  placeFood();
+}
+function placeFood(){
+  do{food={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)}}
+  while(snake.some(s=>s.x===food.x&&s.y===food.y));
+}
+
+function draw(){
+  const cs=cellSize;
+  ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='rgba(255,255,255,0.03)';ctx.lineWidth=0.5;
+  for(let i=0;i<=COLS;i++){ctx.beginPath();ctx.moveTo(i*cs,0);ctx.lineTo(i*cs,canvas.height);ctx.stroke()}
+  for(let j=0;j<=ROWS;j++){ctx.beginPath();ctx.moveTo(0,j*cs);ctx.lineTo(canvas.width,j*cs);ctx.stroke()}
+
+  // food — 发光圆
+  ctx.fillStyle='#f15bb5';ctx.shadowBlur=10;ctx.shadowColor='#f15bb5';
+  ctx.beginPath();ctx.arc(food.x*cs+cs/2,food.y*cs+cs/2,cs/2-2,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+
+  // snake — 渐变色
+  snake.forEach((seg,i)=>{
+    const ratio=1-i/snake.length;
+    const r=Math.round(0*ratio+155*(1-ratio));
+    const g=Math.round(245*ratio+89*(1-ratio));
+    const b=Math.round(212*ratio+182*(1-ratio));
+    ctx.fillStyle=i===0?'#00f5d4':'rgb('+r+','+g+','+b+')';
+    if(i===0){ctx.shadowBlur=8;ctx.shadowColor='#00f5d4'}
+    const pad=Math.max(1,cs*0.06);
+    ctx.fillRect(seg.x*cs+pad,seg.y*cs+pad,cs-pad*2,cs-pad*2);
+    ctx.shadowBlur=0;
+  });
+
+  if(paused){
+    ctx.fillStyle='rgba(0,0,0,0.55)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#00f5d4';
+    ctx.font='bold '+Math.round(canvas.width*0.07)+'px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('⏸ Paused',canvas.width/2,canvas.height/2);
+  }
+}
+
+function update(){
+  if(paused)return;
+  const head={x:snake[0].x+dx,y:snake[0].y+dy};
+  if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS){gameOver();return}
+  if(snake.some(s=>s.x===head.x&&s.y===head.y)){gameOver();return}
+  snake.unshift(head);
+  if(head.x===food.x&&head.y===food.y){
+    score+=10;document.getElementById('score').textContent=score;placeFood();
+  }else{
+    snake.pop();
+  }
+  draw();
+}
+
+function gameOver(){
+  clearInterval(loop);running=false;
+  if(score>highScore){
+    highScore=score;localStorage.setItem('snakeHighScore',highScore);
+    document.getElementById('highScore').textContent=highScore;
+    document.getElementById('gameOverTitle').textContent='🏆 New Record!';
+  }else{
+    document.getElementById('gameOverTitle').textContent='Game Over!';
+  }
+  document.getElementById('gameOverMsg').textContent='Score: '+score;
+  document.getElementById('gameOverOverlay').style.display='flex';
+}
+
+function startGame(){
+  resizeCanvas();
+  document.getElementById('startOverlay').style.display='none';
+  document.getElementById('gameOverOverlay').style.display='none';
+  init();draw();running=true;
+  // 移动端稍快一点，因为操作稍慢
+  const isMobile=window.matchMedia('(pointer:coarse)').matches;
+  loop=setInterval(update,isMobile?140:120);
+}
+
+// ── 方向控制 ───────────────────────────────
+const SWIPE_THRESHOLD=15; // 最小滑动距离 px
+let pendingDir=null;
+
+function setDir(nx,ny){
+  // 不能 180° 反转
+  if(nx===-dx&&ny===-dy)return;
+  if(nx===dx&&ny===dy)return;
+  pendingDir={x:nx,y:ny};
+}
+
+function applyDir(){
+  if(pendingDir){
+    dx=pendingDir.x;dy=pendingDir.y;
+    pendingDir=null;
+  }
+}
+
+// 键盘
+document.addEventListener('keydown',e=>{
+  if(!running&&e.key===' '){startGame();e.preventDefault();return}
+  switch(e.key){
+    case'ArrowUp':case'w':case'W':setDir(0,-1);e.preventDefault();break;
+    case'ArrowDown':case's':case'S':setDir(0,1);e.preventDefault();break;
+    case'ArrowLeft':case'a':case'A':setDir(-1,0);e.preventDefault();break;
+    case'ArrowRight':case'd':case'D':setDir(1,0);e.preventDefault();break;
+    case' ':if(running){paused=!paused;if(!paused)draw()}e.preventDefault();break;
+  }
+});
+
+// ── 触摸滑动（绑定在 gameContainer 上，passive:false 可阻止默认）──
+let touchStartX=0,touchStartY=0,touchActive=false;
+
+container.addEventListener('touchstart',e=>{
+  if(e.touches.length!==1)return;
+  touchStartX=e.touches[0].clientX;
+  touchStartY=e.touches[0].clientY;
+  touchActive=true;
+  e.preventDefault();
+},{passive:false});
+
+container.addEventListener('touchmove',e=>{
+  if(!touchActive||e.touches.length!==1){e.preventDefault();return}
+  const dx2=e.touches[0].clientX-touchStartX;
+  const dy2=e.touches[0].clientY-touchStartY;
+  const absX=Math.abs(dx2),absY=Math.abs(dy2);
+  if(Math.max(absX,absY)<SWIPE_THRESHOLD){e.preventDefault();return}
+  // 判断方向并立即响应
+  if(absX>absY){
+    setDir(dx2>0?1:-1,0);
+  }else{
+    setDir(0,dy2>0?1:-1);
+  }
+  // 重置起点，实现连续滑动转向
+  touchStartX=e.touches[0].clientX;
+  touchStartY=e.touches[0].clientY;
+  e.preventDefault();
+},{passive:false});
+
+container.addEventListener('touchend',e=>{
+  touchActive=false;
+  e.preventDefault();
+},{passive:false});
+
+// ── 虚拟方向键 ─────────────────────────────
+document.querySelectorAll('.dpad-btn').forEach(btn=>{
+  const dir=btn.dataset.dir;
+  const handler=function(e){
+    e.preventDefault();e.stopPropagation();
+    if(!running)return;
+    switch(dir){
+      case'up':setDir(0,-1);break;
+      case'down':setDir(0,1);break;
+      case'left':setDir(-1,0);break;
+      case'right':setDir(1,0);break;
+    }
+  };
+  btn.addEventListener('touchstart',handler,{passive:false});
+  btn.addEventListener('mousedown',handler);
+});
+
+// ── 游戏循环优化：在 update 前应用方向 ──────
+const origUpdate=update;
+update=function(){
+  if(paused)return;
+  applyDir();
+  origUpdate();
+};
+
+// ── 启动 ───────────────────────────────────
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('restartBtn').addEventListener('click',startGame);
+
+// 防止双击缩放
+document.addEventListener('dblclick',e=>e.preventDefault());
+// 防止 iOS 橡皮筋滚动
+document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+})();
+</script>
+</body>
+</html>
