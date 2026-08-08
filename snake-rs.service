@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=heron
-WorkingDirectory=/home/heron/projects/snake-rs
-ExecStart=/home/heron/projects/snake-rs/target/release/snake-rs
+WorkingDirectory=/home/heron/workspace/snake-rs
+ExecStart=/home/heron/workspace/snake-rs/target/release/snake-rs
 Restart=always
 RestartSec=5
 Environment=PORT=8081
